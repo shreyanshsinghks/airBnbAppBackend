@@ -1,15 +1,21 @@
 package com.shreyanshsinghks.airbnbapp.service;
 
 import com.shreyanshsinghks.airbnbapp.dto.HotelDto;
+import com.shreyanshsinghks.airbnbapp.dto.HotelInfoDto;
+import com.shreyanshsinghks.airbnbapp.dto.RoomDto;
 import com.shreyanshsinghks.airbnbapp.entity.Hotel;
 import com.shreyanshsinghks.airbnbapp.entity.Room;
 import com.shreyanshsinghks.airbnbapp.exception.ResourceNotFoundException;
 import com.shreyanshsinghks.airbnbapp.repository.HotelRepository;
+import com.shreyanshsinghks.airbnbapp.repository.RoomRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -18,6 +24,7 @@ public class HotelServiceImpl implements HotelService {
     private final HotelRepository hotelRepository;
     private final ModelMapper modelMapper;
     private final InventoryService inventoryService;
+    private final RoomRepository roomRepository;
 
     @Override
     public HotelDto createNewHotel(HotelDto hotelDto) {
@@ -60,7 +67,8 @@ public class HotelServiceImpl implements HotelService {
                 .orElseThrow(() -> new ResourceNotFoundException("Hotel not found with id " + hotelId));
 
         for (Room room:  hotel.getRooms()) {
-            inventoryService.deleteFutureInventories(room);
+            inventoryService.deleteAllInventories(room);
+            roomRepository.deleteById(room.getId());
         }
         hotelRepository.deleteById(hotelId);
     }
@@ -79,5 +87,17 @@ public class HotelServiceImpl implements HotelService {
             inventoryService.initializeRoomForAYear(room);
         }
 
+    }
+
+    @Override
+    public HotelInfoDto getHotelInfoById(Long hotelId) {
+        Hotel hotel = hotelRepository
+                .findById(hotelId)
+                .orElseThrow(() -> new ResourceNotFoundException("Hotel not found with id " + hotelId));
+        List<RoomDto> rooms = hotel.getRooms()
+                .stream()
+                .map((element) -> modelMapper.map(element, RoomDto.class))
+                .toList();
+        return new HotelInfoDto(modelMapper.map(hotel, HotelDto.class), rooms);
     }
 }
